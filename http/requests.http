@@ -1,0 +1,95 @@
+@baseUrl = http://localhost:8085
+
+@alice = 11111111-1111-1111-1111-111111111111
+@bob = 22222222-2222-2222-2222-222222222222
+@carol = 33333333-3333-3333-3333-333333333333
+@eve = 44444444-4444-4444-4444-444444444444
+
+### Health
+GET {{baseUrl}}/actuator/health
+
+### Create account
+POST {{baseUrl}}/api/v1/accounts
+Content-Type: application/json
+
+{
+  "ownerName": "John Doe",
+  "email": "john.doe@example.com",
+  "currency": "USD",
+  "initialBalance": 300.00
+}
+
+### Get account (cached in Redis)
+GET {{baseUrl}}/api/v1/accounts/{{alice}}
+
+### Transfer Alice -> Bob
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-transfer-0001
+
+{
+  "sourceAccountId": "{{alice}}",
+  "targetAccountId": "{{bob}}",
+  "amount": 100.00
+}
+
+### Replay the same request (200, Idempotent-Replayed: true)
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-transfer-0001
+
+{
+  "sourceAccountId": "{{alice}}",
+  "targetAccountId": "{{bob}}",
+  "amount": 100.00
+}
+
+### Insufficient funds (422, transfer persisted as FAILED)
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-insufficient-0001
+
+{
+  "sourceAccountId": "{{bob}}",
+  "targetAccountId": "{{alice}}",
+  "amount": 99999.00
+}
+
+### Blocked source account (422, SOURCE_NOT_ACTIVE)
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-blocked-0001
+
+{
+  "sourceAccountId": "{{carol}}",
+  "targetAccountId": "{{alice}}",
+  "amount": 10.00
+}
+
+### Currency mismatch (422, CURRENCY_MISMATCH)
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-currency-0001
+
+{
+  "sourceAccountId": "{{alice}}",
+  "targetAccountId": "{{eve}}",
+  "amount": 10.00
+}
+
+### Transfer history
+GET {{baseUrl}}/api/v1/accounts/{{alice}}/transfers?page=0&size=20
+
+### Validation error (400)
+POST {{baseUrl}}/api/v1/transfers
+Content-Type: application/json
+Idempotency-Key: requests-file-validation-0001
+
+{
+  "sourceAccountId": "{{alice}}",
+  "targetAccountId": "{{alice}}",
+  "amount": -5.00
+}
+
+### OpenAPI
+GET {{baseUrl}}/v3/api-docs
